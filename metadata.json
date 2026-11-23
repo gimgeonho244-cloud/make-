@@ -1,0 +1,6 @@
+{
+  "name": "고교학점제 5등급제 대입 나침반",
+  "description": "2009년생 이후 5등급제 내신을 9등급제로 정밀 환산하고, 학생 정보 기반 맞춤형 대학·학과 추천, 학년별 생기부·세특 전략, 선택과목별 공부법과 실제 대학 권장과목을 안내하는 대입 설계 플랫폼입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

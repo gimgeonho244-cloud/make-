@@ -1,11 +1,78 @@
-<div align="center">
+# 고교학점제 5등급제 대입 나침반
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+2009년생 이후 적용되는 **고교학점제 5등급제 내신·모의고사 등급 환산**, **학교별·학년·학급 석차 계산**, **전국 180개 대학 36,000개 학과 맞춤 추천**, **학교별 기출문제(상·중·하)** 및 **AI 강사 판서 그림 요약 노트북**을 한곳에 모은 대입 설계 웹 애플리케이션입니다.
 
-  <h1>Built with AI Studio</h2>
+## 주요 기능
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+1. **내신·모의고사 분리 환산 및 학년/반 석차 산출**
+   - 출생연도별 자동 판별: **2008년생(고3) 9등급제** vs **2009년생 이상 5등급제 → 9등급제 정밀 환산**
+   - **2단계 내신 시험 선택**: `1학기 / 2학기` × `중간고사 / 기말고사` 분리 입력 및 환산 (`정보`는 1학기 기말고사 전용, `인기초(인공지능 기초)`는 2학기 기말고사 전용 자동 반영)
+   - **모의고사 시험 선택**: `3모`, `6모`, `9모`, `10모` (고3은 `수능` 포함) 시험별 분리 입력·저장
+   - **학교별 학년 석차 & 반 등수 계산**: 목포덕인고(1학년 183명, 1~7반 정원) 등 학교 편제 반영, 인원 직접 수정 및 등수 역산기·등급별 석차 커트라인 표 제공
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+2. **전국 180개 대학 · 36,000개 학과 탐색 및 고교 진학 통계**
+   - 선택한 내신 시험 또는 모의고사 기준으로 지원 가능 대학(안정 / 적정 / 상향) 즉시 분석
+   - 36,000개 학과 카탈로그 검색, 학과 설명·권장 선택과목·재학 고교 진학 추정 인원 표시
 
-</div>
+3. **학교별 기출문제 (상·중·하) & AI 강사 그림 요약 노트북**
+   - 학교·과목·학기·고사 및 **기출 난이도(`전체`, `하`, `중`, `상`)** 필터링과 객관식 즉시 채점·서술형 채점 기준 제공
+   - **시험 범위 입력창**을 통해 입력한 단원에 맞춰 **AI 강사 맞춤 기출 출제** (`/api/study/generate-exam`) 및 **판서 도해 그림이 포함된 줄노트북 요약 노트** (`/api/study/generate-note`) 생성
+
+4. **생기부·세특 및 선택과목 공부법 가이드**
+   - 고1·고2·고3 수준별 실행 체크리스트, 계열별 세특 탐구 주제 예시, 선택과목별 공부법 및 대학별 권장과목 매트릭스 제공
+
+## 기술 스택
+
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React
+- **Backend**: Node.js (v22+), Express, `@google/genai` (서버 사이드 Gemini API 연동)
+
+## 시작하기
+
+### 1. 의존성 설치
+
+```bash
+npm install
+```
+
+### 2. 환경 변수 설정
+
+`.env.example`을 참고하여 `.env` 파일을 생성합니다.
+
+```env
+GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+```
+
+### 3. 개발 서버 실행
+
+```bash
+npm run dev
+```
+
+브라우저에서 `http://localhost:3000`으로 접속합니다.
+
+### 4. 타입 검사 · 프로덕션 빌드 · 실행
+
+```bash
+npm run lint
+npm run build
+npm start
+```
+
+## 프로젝트 구조
+
+```text
+├── .github/workflows/ci.yml   # GitHub Actions CI (타입 검사 및 빌드 검증)
+├── server.ts                  # Express 서버 및 Gemini AI 학습 생성 API
+├── index.html                 # HTML 진입점 및 웹폰트/메타데이터
+├── package.json
+└── src/
+    ├── App.tsx
+    ├── types/admission.ts     # 핵심 도메인 타입 정의
+    ├── utils/gradeConverter.ts# 5등급↔9등급 환산 및 모의고사 계산 로직
+    ├── data/                  # 대학·36k학과·고교편제·기출·요약노트·세특 데이터
+    └── components/            # 화면 컴포넌트 (DiagramBoard, InstructorNotebook 등)
+```
+
+## 라이선스
+
+Apache-2.0 License (`LICENSE` 파일 참고)
