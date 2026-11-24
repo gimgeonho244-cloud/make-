@@ -19,6 +19,7 @@ import {
   ExamPeriodKind,
   ExamTermConversionSummary,
   GradeConversionResult,
+  MissionState,
   MockExamPeriod,
   MockGrades,
   NaesinBasis,
@@ -38,11 +39,15 @@ import {
   semesterAndExamToBasis,
   subjectAppliesToExam,
 } from '../utils/gradeConverter';
+import { GradeMissionPanel } from './GradeMissionPanel';
 
 interface GradeConverterSectionProps {
   profile: StudentProfile;
   conversion: GradeConversionResult;
+  mission: MissionState;
+  onUpdateMission: (nextMission: MissionState) => void;
   onUpdateProfile: (patch: Partial<StudentProfile>) => void;
+  onNavigatePastExams: () => void;
   onNavigateUniversities: (basis?: NaesinBasis) => void;
 }
 
@@ -107,14 +112,24 @@ const CONVERSION_TABLE = [
 export const GradeConverterSection: React.FC<GradeConverterSectionProps> = ({
   profile,
   conversion,
+  mission,
+  onUpdateMission,
   onUpdateProfile,
+  onNavigatePastExams,
   onNavigateUniversities,
 }) => {
   const [newSubjName, setNewSubjName] = useState('');
   const [newSubjGrade, setNewSubjGrade] = useState(2);
   const [newSubjSchedule, setNewSubjSchedule] = useState<'both' | 'finalOnly'>('both');
-  const [manualGradeRankInput, setManualGradeRankInput] = useState<string>('');
-  const [manualClassRankInput, setManualClassRankInput] = useState<string>('');
+
+  const manualGradeRankInput =
+    profile.manualOverallGradeRank !== undefined
+      ? String(profile.manualOverallGradeRank)
+      : '';
+  const manualClassRankInput =
+    profile.manualOverallClassRank !== undefined
+      ? String(profile.manualOverallClassRank)
+      : '';
 
   const { semester: activeSemester, exam: activeExam } = basisToSemesterAndExam(
     profile.naesinBasis
@@ -199,6 +214,14 @@ export const GradeConverterSection: React.FC<GradeConverterSectionProps> = ({
         ? nextAvg
         : profile.nineTierDirectGrade,
     });
+  };
+
+  const handleActiveSubjectRankChange = (id: string, rankVal?: number) => {
+    const rankField = activeExam === 'midterm' ? 'midtermRank' : 'finalRank';
+    const nextSubjects = profile.subjectGrades.map((s) =>
+      s.id === id ? { ...s, [rankField]: rankVal } : s
+    );
+    onUpdateProfile({ subjectGrades: nextSubjects });
   };
 
   const handleAddElectiveSubject = () => {
@@ -308,8 +331,27 @@ export const GradeConverterSection: React.FC<GradeConverterSectionProps> = ({
         </div>
       )}
 
+      {/* 성적 목표 미션 · 군대 계급 & 기출 토큰 */}
+      <GradeMissionPanel
+        profile={profile}
+        conversion={conversion}
+        roster={roster}
+        mission={mission}
+        onUpdateMission={onUpdateMission}
+        onUpdateProfile={onUpdateProfile}
+        onNavigatePastExams={onNavigatePastExams}
+        onScrollToGradeEditor={() => {
+          document
+            .getElementById('naesin-grade-editor')
+            ?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
+
       {/* PART 1: 내신 학기(1·2학기) + 시험(중간·기말) 선택 및 환산 */}
-      <section className="bg-white border border-slate-200 rounded-xl p-6 space-y-6">
+      <section
+        id="naesin-grade-editor"
+        className="bg-white border border-slate-200 rounded-xl p-6 space-y-6"
+      >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
             <div className="text-xs font-semibold text-blue-700">
@@ -444,6 +486,10 @@ export const GradeConverterSection: React.FC<GradeConverterSectionProps> = ({
                     activeExam === 'midterm'
                       ? subj.midtermGrade
                       : subj.finalGrade;
+                  const rankVal =
+                    activeExam === 'midterm'
+                      ? subj.midtermRank
+                      : subj.finalRank;
                   return (
                     <div
                       key={subj.id}
@@ -476,6 +522,22 @@ export const GradeConverterSection: React.FC<GradeConverterSectionProps> = ({
                             )
                           )}
                         </select>
+                        <input
+                          type="number"
+                          min={1}
+                          max={roster.gradeTotalStudents}
+                          value={rankVal ?? ''}
+                          onChange={(e) => {
+                            const r = parseInt(e.target.value, 10);
+                            handleActiveSubjectRankChange(
+                              subj.id,
+                              Number.isFinite(r) && r >= 1 ? r : undefined
+                            );
+                          }}
+                          title={`${subj.name} 실제 전교 석차 (선택 입력)`}
+                          placeholder="석차"
+                          className="w-14 h-8 px-1.5 text-xs font-mono-num bg-slate-50 border border-slate-300 rounded-md text-center"
+                        />
                         {subj.isElective && (
                           <button
                             type="button"
@@ -961,7 +1023,13 @@ export const GradeConverterSection: React.FC<GradeConverterSectionProps> = ({
                     min={1}
                     max={roster.gradeTotalStudents}
                     value={manualGradeRankInput}
-                    onChange={(e) => setManualGradeRankInput(e.target.value)}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      onUpdateProfile({
+                        manualOverallGradeRank:
+                          Number.isFinite(val) && val >= 1 ? val : undefined,
+                      });
+                    }}
                     placeholder={`예: ${rankInfo.gradeRank}`}
                     className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-md font-mono-num"
                   />
@@ -973,7 +1041,13 @@ export const GradeConverterSection: React.FC<GradeConverterSectionProps> = ({
                     min={1}
                     max={roster.selectedClassStudents}
                     value={manualClassRankInput}
-                    onChange={(e) => setManualClassRankInput(e.target.value)}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      onUpdateProfile({
+                        manualOverallClassRank:
+                          Number.isFinite(val) && val >= 1 ? val : undefined,
+                      });
+                    }}
                     placeholder={`예: ${rankInfo.classRank}`}
                     className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-md font-mono-num"
                   />

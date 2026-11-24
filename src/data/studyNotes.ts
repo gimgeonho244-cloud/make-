@@ -900,36 +900,45 @@ export function getBaselineSummaryNote(
   semester: SemesterType,
   examKind: ExamPeriodKind,
   examScope: string,
-  difficultyFocus: QuestionDifficulty | '전체'
+  difficultyFocus: QuestionDifficulty | '전체',
+  publisher = '출판사 전체(공통)'
 ): InstructorSummaryNote {
   const cat = normalizeNoteCategory(subjectName);
   const template = BASELINE_NOTES[cat];
   const cleanScope = examScope.trim() || `${subjectName} ${semester} 핵심 시험 범위`;
+  const cleanPublisher = publisher.trim() || '출판사 전체(공통)';
+  const publisherPrefix =
+    cleanPublisher !== '출판사 전체(공통)'
+      ? `[${cleanPublisher} 교과서 기준] `
+      : '';
 
   if (template) {
     return {
-      id: `curated-${subjectName}-${semester}-${examKind}`,
+      id: `curated-${subjectName}-${cleanPublisher}-${semester}-${examKind}`,
       schoolName,
       subjectName,
+      publisher: cleanPublisher,
       semester,
       examKind,
       examScope: cleanScope,
       difficultyFocus,
       source: 'curated',
       ...template,
+      instructorGreeting: `${publisherPrefix}${template.instructorGreeting}`,
     };
   }
 
   return {
-    id: `curated-generic-${subjectName}-${semester}-${examKind}`,
+    id: `curated-generic-${subjectName}-${cleanPublisher}-${semester}-${examKind}`,
     schoolName,
     subjectName,
+    publisher: cleanPublisher,
     semester,
     examKind,
     examScope: cleanScope,
     difficultyFocus,
     source: 'curated',
-    instructorGreeting: `${schoolName} ${subjectName} (${cleanScope}) 내신 대비 노트입니다. 위 시험 범위를 입력하고 [AI 강사 맞춤 노트 만들기]를 누르면 해당 단원에 딱 맞춘 판서 그림과 핵심 정리를 새로 그려드립니다.`,
+    instructorGreeting: `${publisherPrefix}${schoolName} ${subjectName} (${cleanScope}) 내신 대비 노트입니다. 위 시험 범위와 출판사를 확인하고 [AI 강사 그림 · 요약 노트 만들기]를 누르면 해당 교과서 단원에 딱 맞춘 판서 그림과 핵심 정리를 새로 그려드립니다.`,
     diagram: {
       visualType: 'conceptMap',
       title: `${subjectName} 시험 범위 핵심 개념 연결도`,

@@ -4,22 +4,28 @@ import {
   BookOpen,
   BookOpenCheck,
   CheckCircle2,
+  Coins,
   Eye,
   EyeOff,
   FileText,
   HelpCircle,
   Loader2,
+  Lock,
   PenTool,
   RotateCcw,
+  Target,
   XCircle,
 } from 'lucide-react';
 import {
   getSchoolClassRoster,
   inferHighSchoolType,
 } from '../data/highSchools';
+import { MILITARY_RANKS } from '../data/militaryRanks';
 import {
   CORE_PAST_EXAM_SUBJECTS,
   PAST_EXAM_PRESET_SCHOOLS,
+  getPublisherCurriculumHint,
+  getPublishersForSubject,
   getSchoolPastExam,
   getSuggestedScopesForSubject,
 } from '../data/pastExams';
@@ -28,6 +34,7 @@ import {
   ExamPeriodKind,
   HighSchoolType,
   InstructorSummaryNote,
+  MissionState,
   PastExamQuestion,
   QuestionDifficulty,
   SemesterType,
@@ -35,9 +42,13 @@ import {
 } from '../types/admission';
 import { basisToSemesterAndExam } from '../utils/gradeConverter';
 import { InstructorNotebook } from './InstructorNotebook';
+import { RankInsignia } from './RankInsignia';
 
 interface PastExamsSectionProps {
   profile: StudentProfile;
+  mission: MissionState;
+  onConsumeToken: (questionId: string) => boolean;
+  onNavigateMission: () => void;
 }
 
 type StudyWorkspaceMode = 'questions' | 'notebook';
@@ -45,6 +56,9 @@ type DifficultyFilter = '전체' | QuestionDifficulty;
 
 export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
   profile,
+  mission,
+  onConsumeToken,
+  onNavigateMission,
 }) => {
   const initialExamPair = basisToSemesterAndExam(profile.naesinBasis);
 
@@ -69,6 +83,9 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
 
   const initialSubject = uniqueSubjects[0] ?? '공통국어1';
   const [selectedSubject, setSelectedSubject] = useState<string>(initialSubject);
+  const [selectedPublisher, setSelectedPublisher] =
+    useState<string>('출판사 전체(공통)');
+  const [customPublisherInput, setCustomPublisherInput] = useState<string>('');
   const [difficultyFilter, setDifficultyFilter] =
     useState<DifficultyFilter>('전체');
   const [examScope, setExamScope] = useState<string>(
@@ -101,10 +118,22 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
     [selectedSubject]
   );
 
+  const subjectPublishers = useMemo(
+    () => getPublishersForSubject(selectedSubject),
+    [selectedSubject]
+  );
+
+  const activePublisher =
+    customPublisherInput.trim() || selectedPublisher || '출판사 전체(공통)';
+
   const handleSelectSubject = (subjName: string) => {
     setSelectedSubject(subjName);
     const nextScopes = getSuggestedScopesForSubject(subjName);
     setExamScope(nextScopes[0] ?? '');
+    const nextPubs = getPublishersForSubject(subjName);
+    if (!customPublisherInput.trim() && !nextPubs.includes(selectedPublisher)) {
+      setSelectedPublisher('출판사 전체(공통)');
+    }
     setAiGeneratedQuestions(null);
     setAiGeneratedNote(null);
     setAiExamError(null);
@@ -157,9 +186,17 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
         selectedSchoolType,
         selectedSubject,
         semester,
-        examKind
+        examKind,
+        activePublisher
       ),
-    [selectedSchoolName, selectedSchoolType, selectedSubject, semester, examKind]
+    [
+      selectedSchoolName,
+      selectedSchoolType,
+      selectedSubject,
+      semester,
+      examKind,
+      activePublisher,
+    ]
   );
 
   const activeQuestionsSource = aiGeneratedQuestions ?? pastExam.questions;
@@ -180,7 +217,8 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
         pastExam.semester,
         pastExam.examKind,
         examScope,
-        difficultyFilter
+        difficultyFilter,
+        activePublisher
       ),
     [
       pastExam.schoolName,
@@ -189,6 +227,7 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
       pastExam.examKind,
       examScope,
       difficultyFilter,
+      activePublisher,
     ]
   );
 
@@ -220,6 +259,7 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
           highSchoolType: selectedSchoolType,
           gradeYear: profile.gradeYear,
           subjectName: pastExam.subjectName,
+          publisher: activePublisher,
           semester: pastExam.semester,
           examKind: pastExam.examKind,
           examScope: examScope.trim(),
@@ -264,6 +304,7 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
           highSchoolType: selectedSchoolType,
           gradeYear: profile.gradeYear,
           subjectName: pastExam.subjectName,
+          publisher: activePublisher,
           semester: pastExam.semester,
           examKind: pastExam.examKind,
           examScope: examScope.trim(),
@@ -287,8 +328,68 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
     }
   };
 
+  const currentRank =
+    MILITARY_RANKS[
+      Math.min(MILITARY_RANKS.length - 1, Math.max(0, mission.rankIndex))
+    ];
+
+  const attemptQuestionAction = (
+    q: PastExamQuestion,
+    action: () => void
+  ) => {
+    const alreadyUnlocked = mission.unlockedQuestionIds.includes(q.id);
+    if (alreadyUnlocked) {
+      action();
+      return;
+    }
+    const ok = onConsumeToken(q.id);
+    if (ok) {
+      action();
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Rank & Token Status Bar */}
+      <section className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <RankInsignia rank={currentRank} size="md" />
+          <div>
+            <div className="text-xs font-semibold text-blue-700">
+              기출 문제 풀이 토큰권 · 현재 계급 {currentRank.name}
+            </div>
+            <div className="text-sm sm:text-base font-bold text-slate-900 font-mono-num">
+              보유 기출 토큰 {mission.tokens}개{' '}
+              <span className="text-xs sm:text-sm font-medium text-slate-600">
+                (1문제당 토큰 1개 차감 · 누적 {mission.totalSolvedQuestions}문제 풀이 완료)
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              {mission.tokens > 0
+                ? `현재 ${mission.tokens}문제를 새로 풀어 채점·해설까지 확인할 수 있습니다. (요약 노트북은 토큰 없이 무료 열람 가능)`
+                : '남은 기출 풀이 토큰이 0개입니다. 성적 목표에 도달하면 계급 진급과 함께 토큰 2개가 지급됩니다.'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onNavigateMission}
+          className={`px-4 py-2.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+            mission.tokens === 0
+              ? 'bg-blue-700 text-white hover:bg-blue-800'
+              : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+          }`}
+        >
+          <Target className="w-4 h-4" />
+          <span>
+            {mission.tokens === 0
+              ? '성적 목표 도달해서 토큰 2개 받기'
+              : '성적 목표 · 계급 미션 보기'}
+          </span>
+        </button>
+      </section>
+
       {/* Header, School/Subject Filter, Exam Scope & Difficulty Controls */}
       <section className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-4">
@@ -454,6 +555,60 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* Textbook Publisher Selection */}
+        <div className="pt-4 border-t border-slate-200 space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <span className="font-bold text-slate-800">
+              교과서 출판사 선택 ({selectedSubject} 기준 · 기출 및 요약 노트 공통 적용)
+            </span>
+            <span className="text-blue-700 font-medium">
+              현재 선택: {activePublisher}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {subjectPublishers.map((pub) => {
+              const isSelected =
+                !customPublisherInput.trim() && selectedPublisher === pub;
+              return (
+                <button
+                  key={pub}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPublisher(pub);
+                    setCustomPublisherInput('');
+                    setAiGeneratedQuestions(null);
+                    setAiGeneratedNote(null);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    isSelected
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {pub}
+                </button>
+              );
+            })}
+
+            <input
+              type="text"
+              value={customPublisherInput}
+              onChange={(e) => {
+                setCustomPublisherInput(e.target.value);
+                setAiGeneratedQuestions(null);
+                setAiGeneratedNote(null);
+              }}
+              placeholder="기타 출판사·교재명 직접 입력 (예: EBS 올림포스)"
+              className="h-8 px-3 text-xs bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 min-w-[210px] flex-1 sm:flex-initial"
+            />
+          </div>
+
+          <p className="text-xs text-slate-600">
+            {getPublisherCurriculumHint(selectedSubject, activePublisher)}
+          </p>
         </div>
 
         {/* Exam Scope Input + Difficulty (상·중·하) + AI Generation Controls */}
@@ -723,7 +878,8 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
             <div className="flex items-center gap-2">
               <BookOpenCheck className="w-5 h-5 text-blue-700" />
               <h3 className="text-lg font-bold text-slate-900">
-                {pastExam.schoolName} {pastExam.subjectName} 기출 문항
+                {pastExam.schoolName} {pastExam.subjectName}
+                {activePublisher !== '출판사 전체(공통)' && ` (${activePublisher})`} 기출 문항
                 {difficultyFilter !== '전체' && ` · 난이도 ${difficultyFilter}`} (
                 {filteredQuestions.length}문항)
               </h3>
@@ -793,16 +949,24 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
           ) : (
             <div className="space-y-4">
               {filteredQuestions.map((q) => {
+                const isUnlocked = mission.unlockedQuestionIds.includes(q.id);
+                const canSpendToken = mission.tokens > 0;
+                const isLockedOut = !isUnlocked && !canSpendToken;
+
                 const chosen = userAnswers[q.id];
-                const isRevealed = !!revealedAnswers[q.id];
-                const hasAnsweredChoice = chosen !== undefined;
+                const isRevealed = isUnlocked && !!revealedAnswers[q.id];
+                const hasAnsweredChoice = isUnlocked && chosen !== undefined;
                 const isCorrect =
                   hasAnsweredChoice && q.correctIndex === chosen;
 
                 return (
                   <div
                     key={q.id}
-                    className="bg-white border border-slate-200 rounded-xl p-6 space-y-4"
+                    className={`bg-white border rounded-xl p-6 space-y-4 ${
+                      isLockedOut
+                        ? 'border-slate-200 bg-slate-50/40'
+                        : 'border-slate-200'
+                    }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2 text-xs">
@@ -823,6 +987,22 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
                         <span className="text-slate-600">{q.unit}</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs font-mono-num">
+                        <span
+                          className={`font-semibold ${
+                            isUnlocked
+                              ? 'text-emerald-700'
+                              : canSpendToken
+                              ? 'text-blue-700'
+                              : 'text-amber-700'
+                          }`}
+                        >
+                          {isUnlocked
+                            ? '풀이 해금됨'
+                            : canSpendToken
+                            ? '풀이 시 토큰 1개 차감'
+                            : '토큰 0개 · 잠금'}
+                        </span>
+                        <span className="text-slate-300">·</span>
                         <span
                           className={`font-bold ${
                             q.difficulty === '상'
@@ -847,36 +1027,40 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
                     {q.choices && q.choices.length > 0 && (
                       <div className="space-y-2 pt-1">
                         {q.choices.map((choice, cIdx) => {
-                          const selected = chosen === cIdx;
+                          const selected = isUnlocked && chosen === cIdx;
                           const showResult = isRevealed || hasAnsweredChoice;
                           const isThisCorrect = q.correctIndex === cIdx;
 
-                          let btnClass =
-                            'bg-slate-50/70 border-slate-200 text-slate-800 hover:bg-slate-100';
+                          let btnClass = isLockedOut
+                            ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-slate-50/70 border-slate-200 text-slate-800 hover:bg-slate-100 cursor-pointer';
                           if (selected && showResult) {
                             btnClass = isThisCorrect
-                              ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-semibold'
-                              : 'bg-red-50 border-red-400 text-red-900 font-semibold';
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-semibold cursor-pointer'
+                              : 'bg-red-50 border-red-400 text-red-900 font-semibold cursor-pointer';
                           } else if (isRevealed && isThisCorrect) {
                             btnClass =
-                              'bg-emerald-50 border-emerald-400 text-emerald-950 font-semibold';
+                              'bg-emerald-50 border-emerald-400 text-emerald-950 font-semibold cursor-pointer';
                           }
 
                           return (
                             <button
                               key={`${q.id}-${cIdx}`}
                               type="button"
+                              disabled={isLockedOut}
                               onClick={() => {
-                                setUserAnswers((prev) => ({
-                                  ...prev,
-                                  [q.id]: cIdx,
-                                }));
-                                setRevealedAnswers((prev) => ({
-                                  ...prev,
-                                  [q.id]: true,
-                                }));
+                                attemptQuestionAction(q, () => {
+                                  setUserAnswers((prev) => ({
+                                    ...prev,
+                                    [q.id]: cIdx,
+                                  }));
+                                  setRevealedAnswers((prev) => ({
+                                    ...prev,
+                                    [q.id]: true,
+                                  }));
+                                });
                               }}
-                              className={`w-full text-left px-4 py-2.5 text-sm rounded-lg border transition-colors flex items-center justify-between gap-2 cursor-pointer ${btnClass}`}
+                              className={`w-full text-left px-4 py-2.5 text-sm rounded-lg border transition-colors flex items-center justify-between gap-2 ${btnClass}`}
                             >
                               <span>{choice}</span>
                               {selected && showResult &&
@@ -891,44 +1075,76 @@ export const PastExamsSection: React.FC<PastExamsSectionProps> = ({
                       </div>
                     )}
 
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                      {hasAnsweredChoice && q.questionType === '객관식' ? (
-                        <span
-                          className={`text-xs font-semibold ${
-                            isCorrect ? 'text-emerald-700' : 'text-red-700'
-                          }`}
+                    {isLockedOut ? (
+                      <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2 text-amber-950">
+                          <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                          <span>
+                            보유 토큰이 부족하여 이 문항을 풀 수 없습니다. 성적 목표를 달성하면 계급 상승과 함께 2문제 풀이 토큰이 지급됩니다.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={onNavigateMission}
+                          className="px-3.5 py-2 font-semibold rounded-lg bg-blue-700 text-white hover:bg-blue-800 whitespace-nowrap shrink-0 cursor-pointer"
                         >
-                          {isCorrect
-                            ? '정답입니다.'
-                            : `오답입니다. 정답은 ${q.answerText}입니다.`}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-500 flex items-center gap-1">
-                          <HelpCircle className="w-3.5 h-3.5" />
-                          {q.questionType === '객관식'
-                            ? '선지를 선택하면 즉시 채점됩니다.'
-                            : '서술형 문항은 직접 풀이 후 모범 답안과 채점 기준을 확인하세요.'}
-                        </span>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => toggleReveal(q.id)}
-                        className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1.5 cursor-pointer"
-                      >
-                        {isRevealed ? (
-                          <>
-                            <EyeOff className="w-3.5 h-3.5" />
-                            <span>정답 · 해설 접기</span>
-                          </>
+                          목표 달성하러 가기
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        {hasAnsweredChoice && q.questionType === '객관식' ? (
+                          <span
+                            className={`text-xs font-semibold ${
+                              isCorrect ? 'text-emerald-700' : 'text-red-700'
+                            }`}
+                          >
+                            {isCorrect
+                              ? '정답입니다.'
+                              : `오답입니다. 정답은 ${q.answerText}입니다.`}
+                          </span>
                         ) : (
-                          <>
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>정답 · 해설 보기</span>
-                          </>
+                          <span className="text-xs text-slate-500 flex items-center gap-1">
+                            {isUnlocked ? (
+                              <HelpCircle className="w-3.5 h-3.5" />
+                            ) : (
+                              <Coins className="w-3.5 h-3.5 text-blue-700" />
+                            )}
+                            {isUnlocked
+                              ? q.questionType === '객관식'
+                                ? '이미 해금된 문항입니다. 선지를 고르면 바로 채점됩니다.'
+                                : '이미 해금된 서술형 문항입니다. 모범 답안과 채점 기준을 확인하세요.'
+                              : q.questionType === '객관식'
+                              ? '선지를 선택하면 토큰 1개가 차감되며 즉시 채점됩니다.'
+                              : '토큰 1개를 사용하여 서술형 풀이와 채점 기준을 확인할 수 있습니다.'}
+                          </span>
                         )}
-                      </button>
-                    </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            attemptQuestionAction(q, () => toggleReveal(q.id));
+                          }}
+                          className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1.5 cursor-pointer"
+                        >
+                          {isRevealed ? (
+                            <>
+                              <EyeOff className="w-3.5 h-3.5" />
+                              <span>정답 · 해설 접기</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>
+                                {isUnlocked
+                                  ? '정답 · 해설 보기'
+                                  : '토큰 1개 사용 · 정답/해설 보기'}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
 
                     {isRevealed && (
                       <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-xs sm:text-sm">

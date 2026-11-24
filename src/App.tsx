@@ -6,11 +6,20 @@ import { PastExamsSection } from './components/PastExamsSection';
 import { SaengibuSection } from './components/SaengibuSection';
 import { SubjectsStudySection } from './components/SubjectsStudySection';
 import { UniversityExplorer } from './components/UniversityExplorer';
+import { RankInsignia } from './components/RankInsignia';
 import {
   calculateRanksFromPercentile,
   getSchoolClassRoster,
 } from './data/highSchools';
-import { MockExamPeriod, StudentProfile } from './types/admission';
+import {
+  MILITARY_RANKS,
+  createInitialMissionState,
+} from './data/militaryRanks';
+import {
+  MissionState,
+  MockExamPeriod,
+  StudentProfile,
+} from './types/admission';
 import {
   convertFiveToNine,
   getBasisLabel,
@@ -127,6 +136,35 @@ export default function App() {
     );
   }, [savedProfile]);
 
+  const missionState: MissionState | null = useMemo(() => {
+    if (!savedProfile || !conversion) return null;
+    if (savedProfile.missionState && savedProfile.missionState.currentGoal) {
+      return savedProfile.missionState;
+    }
+    return createInitialMissionState(savedProfile, conversion);
+  }, [savedProfile, conversion]);
+
+  const handleUpdateMission = (nextMission: MissionState) => {
+    handleUpdateProfile({ missionState: nextMission });
+  };
+
+  const handleConsumeExamToken = (questionId: string): boolean => {
+    if (!missionState) return false;
+    if (missionState.unlockedQuestionIds.includes(questionId)) {
+      return true;
+    }
+    if (missionState.tokens <= 0) {
+      return false;
+    }
+    handleUpdateMission({
+      ...missionState,
+      tokens: missionState.tokens - 1,
+      totalSolvedQuestions: missionState.totalSolvedQuestions + 1,
+      unlockedQuestionIds: [...missionState.unlockedQuestionIds, questionId],
+    });
+    return true;
+  };
+
   const rosterAndRanks = useMemo(() => {
     if (!savedProfile || !conversion) return null;
     const roster = getSchoolClassRoster(
@@ -146,9 +184,20 @@ export default function App() {
     return { roster, ranks };
   }, [savedProfile, conversion]);
 
-  if (!hasEntered || !savedProfile || !conversion || !rosterAndRanks) {
+  if (
+    !hasEntered ||
+    !savedProfile ||
+    !conversion ||
+    !rosterAndRanks ||
+    !missionState
+  ) {
     return <EntryGate initialProfile={savedProfile} onEnter={handleEnter} />;
   }
+
+  const currentRank =
+    MILITARY_RANKS[
+      Math.min(MILITARY_RANKS.length - 1, Math.max(0, missionState.rankIndex))
+    ];
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -229,6 +278,28 @@ export default function App() {
                 {conversion.mock.averageCoreFour.toFixed(2)}등급
               </strong>
             </span>
+            <span className="text-slate-300" aria-hidden="true">
+              |
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('converter');
+                setTimeout(() => {
+                  document
+                    .getElementById('mission-rank-section')
+                    ?.scrollIntoView({ behavior: 'smooth' });
+                }, 50);
+              }}
+              className="inline-flex items-center gap-1.5 text-slate-800 hover:text-blue-700 transition-colors cursor-pointer"
+            >
+              <RankInsignia rank={currentRank} size="sm" />
+              <span className="font-bold">{currentRank.name}</span>
+              <span className="text-slate-400">·</span>
+              <span className="font-semibold text-blue-700">
+                기출 토큰 {missionState.tokens}개
+              </span>
+            </button>
           </div>
         </div>
 
@@ -237,7 +308,13 @@ export default function App() {
           <GradeConverterSection
             profile={savedProfile}
             conversion={conversion}
+            mission={missionState}
+            onUpdateMission={handleUpdateMission}
             onUpdateProfile={handleUpdateProfile}
+            onNavigatePastExams={() => {
+              setActiveTab('pastexams');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onNavigateUniversities={(basis) => {
               if (basis) handleUpdateProfile({ naesinBasis: basis });
               setActiveTab('universities');
@@ -256,7 +333,19 @@ export default function App() {
         )}
 
         {activeTab === 'pastexams' && (
-          <PastExamsSection profile={savedProfile} />
+          <PastExamsSection
+            profile={savedProfile}
+            mission={missionState}
+            onConsumeToken={handleConsumeExamToken}
+            onNavigateMission={() => {
+              setActiveTab('converter');
+              setTimeout(() => {
+                document
+                  .getElementById('mission-rank-section')
+                  ?.scrollIntoView({ behavior: 'smooth' });
+              }, 80);
+            }}
+          />
         )}
 
         {activeTab === 'saengibu' && <SaengibuSection profile={savedProfile} />}

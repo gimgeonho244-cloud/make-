@@ -940,14 +940,166 @@ function createDynamicQuestionsForSubject(
   ];
 }
 
+export const ALL_COMMON_PUBLISHERS: string[] = [
+  '출판사 전체(공통)',
+  '비상교육',
+  '미래엔',
+  '천재교육',
+  '좋은책신사고',
+  '지학사',
+  '동아출판',
+  '능률(NE능률)',
+  'YBM',
+  '창비',
+  '해냄에듀',
+  '금성출판사',
+  '삼양미디어',
+  '씨마스',
+  '교학사',
+];
+
+export function getPublishersForSubject(subjectName: string): string[] {
+  if (
+    subjectName.includes('국어') ||
+    subjectName.includes('문학') ||
+    subjectName.includes('독서') ||
+    subjectName.includes('언어') ||
+    subjectName.includes('화법')
+  ) {
+    return [
+      '출판사 전체(공통)',
+      '비상교육',
+      '미래엔',
+      '천재교육',
+      '창비',
+      '해냄에듀',
+      '지학사',
+      '좋은책신사고',
+      '동아출판',
+    ];
+  }
+  if (
+    subjectName.includes('수학') ||
+    subjectName.includes('대수') ||
+    subjectName.includes('미적분') ||
+    subjectName.includes('확률') ||
+    subjectName.includes('기하')
+  ) {
+    return [
+      '출판사 전체(공통)',
+      '비상교육',
+      '미래엔',
+      '좋은책신사고',
+      '천재교육',
+      '지학사',
+      '동아출판',
+      '금성출판사',
+      '교학사',
+    ];
+  }
+  if (subjectName.includes('영어')) {
+    return [
+      '출판사 전체(공통)',
+      '능률(NE능률)',
+      'YBM',
+      '비상교육',
+      '천재교육',
+      '동아출판',
+      '미래엔',
+      '지학사',
+      '금성출판사',
+    ];
+  }
+  if (subjectName.includes('정보') || subjectName.includes('인기초') || subjectName.includes('인공지능')) {
+    return [
+      '출판사 전체(공통)',
+      '비상교육',
+      '미래엔',
+      '천재교육',
+      '삼양미디어',
+      '씨마스',
+      '금성출판사',
+      '교학사',
+    ];
+  }
+  if (
+    subjectName.includes('사회') ||
+    subjectName.includes('한국사') ||
+    subjectName.includes('경제') ||
+    subjectName.includes('정치')
+  ) {
+    return [
+      '출판사 전체(공통)',
+      '비상교육',
+      '미래엔',
+      '천재교육',
+      '지학사',
+      '해냄에듀',
+      '리베르스쿨',
+      '금성출판사',
+      '동아출판',
+    ];
+  }
+  if (
+    subjectName.includes('과학') ||
+    subjectName.includes('물리') ||
+    subjectName.includes('화학') ||
+    subjectName.includes('생명') ||
+    subjectName.includes('지구')
+  ) {
+    return [
+      '출판사 전체(공통)',
+      '비상교육',
+      '미래엔',
+      '천재교육',
+      '동아출판',
+      '지학사',
+      '금성출판사',
+      '교학사',
+    ];
+  }
+  return ALL_COMMON_PUBLISHERS;
+}
+
+export function getPublisherCurriculumHint(
+  subjectName: string,
+  publisher: string
+): string {
+  const cleanPub = publisher.trim();
+  if (!cleanPub || cleanPub === '출판사 전체(공통)') {
+    return '특정 출판사에 한정하지 않고 공통 교육과정 성취기준과 학교 프린트 중심 기출·요약을 제공합니다.';
+  }
+  if (subjectName.includes('국어') || subjectName.includes('문학')) {
+    return `${cleanPub} 교과서 수록 작품(현대시·소설·고전)과 문법 예문 체계를 기준으로 기출·요약을 맞춥니다.`;
+  }
+  if (subjectName.includes('영어')) {
+    return `${cleanPub} 교과서 단원별 본문 어휘·핵심 구문(관계사·분사·도치)과 서술형 영작 포인트를 반영합니다.`;
+  }
+  if (
+    subjectName.includes('수학') ||
+    subjectName.includes('대수') ||
+    subjectName.includes('미적분') ||
+    subjectName.includes('확률') ||
+    subjectName.includes('기하')
+  ) {
+    return `${cleanPub} 교과서 중단원 마무리·대단원 심화 문제 스타일 및 증명 과정을 반영합니다.`;
+  }
+  if (subjectName.includes('정보') || subjectName.includes('인기초') || subjectName.includes('인공지능')) {
+    return `${cleanPub} 교과서의 파이썬·알고리즘·AI 모델 실습 단원 용어와 수행평가형 서술 기준에 맞춥니다.`;
+  }
+  return `${cleanPub} 교과서의 단원 구성 순서·탐구 활동 자료·핵심 용어 표기를 기준으로 정리합니다.`;
+}
+
 export function getSchoolPastExam(
   schoolName: string,
   highSchoolType: HighSchoolType,
   subjectName: string,
   semester: SemesterType,
-  examKind: ExamPeriodKind
+  examKind: ExamPeriodKind,
+  publisher = '출판사 전체(공통)'
 ): SchoolSubjectPastExam {
   const cleanSchool = schoolName.trim() || '재학 고등학교';
+  const cleanPublisher = publisher.trim() || '출판사 전체(공통)';
   const style = getSchoolStyle(cleanSchool, highSchoolType);
 
   let effectiveSemester = semester;
@@ -961,15 +1113,21 @@ export function getSchoolPastExam(
     effectiveExamKind = 'final';
   }
 
+  const trendWithPublisher =
+    cleanPublisher !== '출판사 전체(공통)'
+      ? `${style.schoolTrendSummary} [선택 교과서: ${cleanPublisher} ${subjectName} — 교과서 탐구 활동·중단원 핵심 문항 연계]`
+      : style.schoolTrendSummary;
+
   return {
     schoolName: cleanSchool,
     highSchoolType,
     subjectName,
+    publisher: cleanPublisher,
     semester: effectiveSemester,
     examKind: effectiveExamKind,
     totalQuestionsInfo: style.totalQuestionsInfo,
     essayRatio: style.essayRatio,
-    schoolTrendSummary: style.schoolTrendSummary,
+    schoolTrendSummary: trendWithPublisher,
     cutScoreEstimate: style.cutScoreEstimate,
     questions: createDynamicQuestionsForSubject(
       cleanSchool,

@@ -30,11 +30,19 @@ export const InstructorNotebook: React.FC<InstructorNotebookProps> = ({
     <div className="bg-[#FFFDF7] border border-slate-300 rounded-xl shadow-sm overflow-hidden">
       {/* Notebook Top Binding Strip */}
       <div className="bg-slate-100 border-b border-slate-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 text-xs text-slate-600">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
           <BookOpen className="w-4 h-4 text-blue-700" />
           <span className="font-bold text-slate-900">
             {note.schoolName} · {note.subjectName} 요약 노트북
           </span>
+          {note.publisher && note.publisher !== '출판사 전체(공통)' && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="font-semibold text-slate-800">
+                출판사: {note.publisher}
+              </span>
+            </>
+          )}
           <span aria-hidden="true">·</span>
           <span>
             {note.semester} {note.examKind === 'midterm' ? '중간고사' : '기말고사'}

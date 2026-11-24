@@ -42,6 +42,8 @@ export interface SchoolSubjectGrade {
   examSchedule?: 'both' | 'midtermOnly' | 'finalOnly';
   midtermGrade: number;
   finalGrade: number;
+  midtermRank?: number;
+  finalRank?: number;
   credits: number;
   isElective?: boolean;
 }
@@ -76,6 +78,9 @@ export interface StudentProfile {
   electives: string[];
   customGradeTotalStudents?: number;
   customClassTotalStudents?: number;
+  manualOverallGradeRank?: number;
+  manualOverallClassRank?: number;
+  missionState?: MissionState;
 }
 
 export interface ExamTermConversionSummary {
@@ -268,6 +273,7 @@ export interface SchoolSubjectPastExam {
   schoolName: string;
   highSchoolType: HighSchoolType;
   subjectName: string;
+  publisher?: string;
   semester: SemesterType;
   examKind: ExamPeriodKind;
   totalQuestionsInfo: string;
@@ -320,6 +326,7 @@ export interface InstructorSummaryNote {
   id: string;
   schoolName: string;
   subjectName: string;
+  publisher?: string;
   semester: SemesterType;
   examKind: ExamPeriodKind;
   examScope: string;
@@ -331,3 +338,68 @@ export interface InstructorSummaryNote {
   examTraps: string[];
   finalChecklist: string[];
 }
+
+export type GoalExamTarget =
+  | 'sem1Mid'
+  | 'sem1Final'
+  | 'sem2Mid'
+  | 'sem2Final'
+  | 'mock_3모'
+  | 'mock_6모'
+  | 'mock_9모'
+  | 'mock_10모'
+  | 'mock_수능';
+
+export interface SubjectGoalTarget {
+  subjectId: string;
+  subjectName: string;
+  enabled: boolean;
+  targetGrade?: number;
+  targetRank?: number;
+}
+
+export interface GoalMission {
+  id: string;
+  examTarget: GoalExamTarget;
+  examLabel: string;
+  targetGrade: number;
+  targetGradeRank?: number;
+  targetClassRank?: number;
+  subjectGoals?: SubjectGoalTarget[];
+  memo: string;
+  createdAt: string;
+  attemptNumber: number;
+}
+
+export interface MissionHistoryEntry {
+  id: string;
+  examLabel: string;
+  targetGrade: number;
+  actualGrade: number;
+  targetGradeRank?: number;
+  actualGradeRank?: number;
+  targetClassRank?: number;
+  actualClassRank?: number;
+  subjectGoalsSummary?: string;
+  succeeded: boolean;
+  rankBefore: string;
+  rankAfter: string;
+  tokensAwarded: number;
+  timestamp: string;
+}
+
+export interface MissionState {
+  rankIndex: number; // 0 (이병) ~ 17 (대장)
+  tokens: number; // 남은 기출 문제 풀이 토큰
+  totalEarnedTokens: number;
+  totalSolvedQuestions: number;
+  unlockedQuestionIds: string[];
+  totalSuccessCount: number;
+  totalFailCount: number;
+  legendaryClearCount: number; // 대장 도달 후 추가 달성 횟수
+  lastOutcome: 'idle' | 'achieved' | 'failed';
+  lastOutcomeMessage: string;
+  currentGoal: GoalMission;
+  history: MissionHistoryEntry[];
+}
+

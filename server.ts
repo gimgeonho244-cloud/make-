@@ -56,6 +56,7 @@ interface GenerateExamBody {
   highSchoolType?: string;
   gradeYear?: number;
   subjectName?: string;
+  publisher?: string;
   semester?: string;
   examKind?: string;
   examScope?: string;
@@ -67,6 +68,7 @@ interface GenerateNoteBody {
   highSchoolType?: string;
   gradeYear?: number;
   subjectName?: string;
+  publisher?: string;
   semester?: string;
   examKind?: string;
   examScope?: string;
@@ -84,6 +86,7 @@ async function startServer() {
       const highSchoolType = (body.highSchoolType || '일반고').trim().slice(0, 30);
       const gradeYear = Number(body.gradeYear) || 1;
       const subjectName = (body.subjectName || '공통수학1').trim().slice(0, 50);
+      const publisher = (body.publisher || '출판사 전체(공통)').trim().slice(0, 50);
       const semester = (body.semester || '1학기').trim().slice(0, 10);
       const examKind = body.examKind === 'midterm' ? '중간고사' : '기말고사';
       const examScope = (body.examScope || '').trim().slice(0, 300);
@@ -100,14 +103,20 @@ async function startServer() {
           ? '난이도 하(1문항), 중(2문항), 상(서술형 또는 고난도 킬러 1문항)을 고르게 섞어 총 4문항을 출제하세요.'
           : `요청된 난이도 "${difficulty}" 수준에 맞춰 총 3문항(객관식 2문항 + 서술형 1문항)을 출제하고, 모든 문항의 difficulty 값을 "${difficulty}"로 설정하세요.`;
 
+      const publisherLine =
+        publisher && publisher !== '출판사 전체(공통)'
+          ? `선택 교과서 출판사: ${publisher} (${publisher} 교과서 단원 편제·핵심 제재·용어 기준 반영)`
+          : '교과서 출판사: 공통 교육과정 기준';
+
       const prompt = [
         `당신은 대한민국 ${highSchoolType} 내신 출제 전문가입니다.`,
         `대상 학교: ${schoolName} ${gradeYear}학년`,
         `과목 및 시험: ${subjectName} (${semester} ${examKind})`,
+        publisherLine,
         `사용자가 입력한 시험 범위: ${examScope}`,
         difficultyRule,
         `규칙:`,
-        `1) 반드시 입력된 시험 범위("${examScope}") 안에서만 실제 고등학교 내신 기출 스타일로 출제하세요.`,
+        `1) 반드시 입력된 시험 범위("${examScope}")와 선택한 출판사("${publisher}") 교과 흐름에 맞춰 실제 고등학교 내신 기출 스타일로 출제하세요.`,
         `2) 객관식은 choices에 5지선다("① ...", "② ...", "③ ...", "④ ...", "⑤ ...")를 넣고 correctIndex(0~4)를 정확히 맞추세요.`,
         `3) 서술형은 choices를 빈 배열([])로 두고 correctIndex는 -1로 두며, scoringRubric(부분점수 배점 기준)을 구체적으로 작성하세요.`,
         `4) 수학/과학 수식은 읽기 쉬운 유니코드 기호(², ³, √, ∑, Δ, →)로 명확히 표기하고 계산 오류가 없어야 합니다.`,
@@ -207,6 +216,7 @@ async function startServer() {
       const highSchoolType = (body.highSchoolType || '일반고').trim().slice(0, 30);
       const gradeYear = Number(body.gradeYear) || 1;
       const subjectName = (body.subjectName || '공통수학1').trim().slice(0, 50);
+      const publisher = (body.publisher || '출판사 전체(공통)').trim().slice(0, 50);
       const semester = (body.semester || '1학기').trim().slice(0, 10);
       const examKind = body.examKind === 'midterm' ? '중간고사' : '기말고사';
       const examScope = (body.examScope || '').trim().slice(0, 300);
@@ -218,13 +228,19 @@ async function startServer() {
       }
 
       const ai = createGeminiClient();
+      const publisherLine =
+        publisher && publisher !== '출판사 전체(공통)'
+          ? `교과서 출판사: ${publisher} (${publisher} 교과서 단원 구조와 대표 예제·작품·용어를 반영하세요)`
+          : '교과서 출판사: 공통 교육과정 기준';
+
       const prompt = [
         `당신은 학생 눈높이에서 그림(개념 도해)을 그려주며 핵심을 짚어주는 대한민국 최고 수준의 고교 내신 전문 강사입니다.`,
         `학생 학교/학년: ${schoolName} (${highSchoolType}) ${gradeYear}학년`,
         `과목 및 시험: ${subjectName} (${semester} ${examKind})`,
+        publisherLine,
         `시험 범위: ${examScope}`,
         `목표 난이도 초점: ${difficulty}`,
-        `위 시험 범위에 딱 맞는 '강의 노트북 요약 + 판서 도해 그림 데이터'를 작성해주세요.`,
+        `위 시험 범위와 출판사 교과서에 딱 맞는 '강의 노트북 요약 + 판서 도해 그림 데이터'를 작성해주세요.`,
         `diagram 작성 가이드:`,
         `- visualType은 시험 범위 성격에 가장 잘 맞는 하나를 선택하세요: 'conceptMap'(중심 개념-세부 개념 연결), 'processFlow'(단계별 풀이/인과 흐름), 'comparison'(두 개념/사상/알고리즘 대비), 'coordinate'(함수 그래프/좌표/추세 곡선).`,
         `- nodes는 4~6개로 간결하게 구성하고, 각 node의 label(짧은 제목), sublabel(핵심 공식/키워드), detail(학생이 노드를 클릭했을 때 보여줄 강사의 구어체 보충 설명 1~2문장), role('core' | 'primary' | 'secondary' | 'warning')을 지정하세요.`,
@@ -345,6 +361,7 @@ async function startServer() {
         id: `ai-note-${Date.now()}`,
         schoolName,
         subjectName,
+        publisher,
         semester: semester === '2학기' ? '2학기' : '1학기',
         examKind: body.examKind === 'midterm' ? 'midterm' : 'final',
         examScope,
